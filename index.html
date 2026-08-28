@@ -7,45 +7,50 @@
   <style>
     body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
     
-    /* 1. カメラ映像（最背面） */
+    /* 1. カメラ映像（全画面） */
     #video-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
     video { width: 100%; height: 100%; object-fit: cover; }
     
-    /* 2. フレーム画像（中間） */
+    /* 2. フレーム画像（下部100pxを空けてボタンエリアと絶対に被らせない） */
     #chroma-canvas {
-      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-      z-index: 2; pointer-events: none; object-fit: contain;
+      position: fixed; 
+      top: 0; 
+      left: 0; 
+      width: 100vw; 
+      height: calc(100vh - 100px); /* 画面下部100px分をボタン専用領域として空ける */
+      z-index: 2; 
+      pointer-events: none; 
+      object-fit: contain;
     }
 
-    /* 3. ボタン配置エリア（最前面・絶対に隠れない領域） */
+    /* 3. ボタンエリア（画面一番下の黒帯エリアに独立配置） */
     #ui-container {
       position: fixed;
       bottom: 0;
       left: 0;
       width: 100vw;
-      height: 120px;
-      z-index: 100; /* 画像より確実に前に配置 */
+      height: 100px;
+      background-color: rgba(0, 0, 0, 0.4); /* 見やすいように薄い黒背景を敷く */
+      z-index: 9999; /* 絶対に最前面 */
       display: flex;
       justify-content: center;
       align-items: center;
-      pointer-events: auto;
     }
 
     /* シャッターボタンのデザイン */
     #shutter-btn {
-      width: 70px;
-      height: 70px;
+      width: 65px;
+      height: 65px;
       background-color: #ffffff;
-      border: 5px solid rgba(255, 255, 255, 0.8);
+      border: 4px solid #ffffff;
       border-radius: 50%;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 0 10px rgba(0,0,0,0.8);
       cursor: pointer;
       outline: none;
-      -webkit-tap-highlight-color: transparent;
+      -webkit-appearance: none;
     }
     #shutter-btn:active {
-      transform: scale(0.9);
-      background-color: #cccccc;
+      background-color: #aaaaaa;
     }
   </style>
 </head>
@@ -55,10 +60,10 @@
     <video id="camera" autoplay playsinline muted></video>
   </div>
   
-  <!-- フレーム画像を描画するキャンバス -->
+  <!-- フレーム画像エリア -->
   <canvas id="chroma-canvas"></canvas>
 
-  <!-- 最前面に固定配置するボタンエリア -->
+  <!-- シャッターボタンエリア（画面最下部） -->
   <div id="ui-container">
     <button id="shutter-btn" aria-label="写真を撮影"></button>
   </div>
