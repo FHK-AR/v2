@@ -11,46 +11,41 @@
     #video-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
     video { width: 100%; height: 100%; object-fit: cover; }
     
-    /* 2. フレーム画像（下部100pxを空けてボタンエリアと絶対に被らせない） */
+    /* 2. フレーム画像 */
     #chroma-canvas {
-      position: fixed; 
-      top: 0; 
-      left: 0; 
-      width: 100vw; 
-      height: calc(100vh - 100px); /* 画面下部100px分をボタン専用領域として空ける */
-      z-index: 2; 
-      pointer-events: none; 
-      object-fit: contain;
+      position: fixed; top: 0; left: 0; width: 100vw; height: calc(100vh - 100px);
+      z-index: 2; pointer-events: none; object-fit: contain;
     }
 
-    /* 3. ボタンエリア（画面一番下の黒帯エリアに独立配置） */
+    /* 3. ボタンエリア */
     #ui-container {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      width: 100vw;
-      height: 100px;
-      background-color: rgba(0, 0, 0, 0.4); /* 見やすいように薄い黒背景を敷く */
-      z-index: 9999; /* 絶対に最前面 */
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      position: fixed; bottom: 0; left: 0; width: 100vw; height: 100px;
+      background-color: rgba(0, 0, 0, 0.4); z-index: 9999;
+      display: flex; justify-content: center; align-items: center;
     }
 
-    /* シャッターボタンのデザイン */
     #shutter-btn {
-      width: 65px;
-      height: 65px;
-      background-color: #ffffff;
-      border: 4px solid #ffffff;
-      border-radius: 50%;
-      box-shadow: 0 0 10px rgba(0,0,0,0.8);
-      cursor: pointer;
-      outline: none;
-      -webkit-appearance: none;
+      width: 65px; height: 65px; background-color: #ffffff;
+      border: 4px solid #ffffff; border-radius: 50%;
+      box-shadow: 0 0 10px rgba(0,0,0,0.8); cursor: pointer; outline: none;
     }
-    #shutter-btn:active {
-      background-color: #aaaaaa;
+
+    /* 4. 撮影結果モーダル（写真保存用ポップアップ） */
+    #result-modal {
+      display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.85); z-index: 10000;
+      flex-direction: column; justify-content: center; align-items: center;
+    }
+    #result-img {
+      max-width: 85%; max-height: 70vh; border-radius: 8px;
+      box-shadow: 0 0 20px rgba(255,255,255,0.2);
+    }
+    #modal-msg {
+      color: #fff; margin: 15px 0; font-size: 14px; font-weight: bold; text-align: center;
+    }
+    #close-btn {
+      padding: 10px 25px; background: #ffffff; border: none;
+      border-radius: 20px; font-weight: bold; cursor: pointer;
     }
   </style>
 </head>
@@ -63,9 +58,16 @@
   <!-- フレーム画像エリア -->
   <canvas id="chroma-canvas"></canvas>
 
-  <!-- シャッターボタンエリア（画面最下部） -->
+  <!-- シャッターボタンエリア -->
   <div id="ui-container">
     <button id="shutter-btn" aria-label="写真を撮影"></button>
+  </div>
+
+  <!-- 撮影結果表示ポップアップ -->
+  <div id="result-modal">
+    <img id="result-img" alt="撮影した写真">
+    <p id="modal-msg">画像を長押しして「"写真"に保存」を選択してください</p>
+    <button id="close-btn">もう一度撮影する</button>
   </div>
 
   <script>
@@ -75,7 +77,7 @@
     const video = document.getElementById('camera');
     const img = new Image();
 
-    // 1. フレーム画像の読み込みとクロマキー（緑色透過）処理
+    // クロマキー処理
     img.src = frameSrc;
     img.onload = () => {
       canvas.width = img.width;
@@ -86,9 +88,7 @@
       const data = imgData.data;
 
       for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
+        const r = data[i]; const g = data[i + 1]; const b = data[i + 2];
         if (g > 90 && g > r * 1.1 && g > b * 1.1) {
           data[i + 3] = 0;
         }
@@ -96,17 +96,14 @@
       ctx.putImageData(imgData, 0, 0);
     };
 
-    // 2. カメラの起動
+    // カメラ起動
     navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user" },
-      audio: false
+      video: { facingMode: "user" }, audio: false
     }).then(stream => {
       video.srcObject = stream;
-    }).catch(err => {
-      alert("カメラの起動に失敗しました: " + err);
-    });
+    }).catch(err => alert("カメラの起動に失敗しました: " + err));
 
-    // 3. シャッターボタンを押した時の保存処理
+    // シャッターボタンタップ時の処理
     document.getElementById('shutter-btn').addEventListener('click', () => {
       const saveCanvas = document.createElement('canvas');
       const saveCtx = saveCanvas.getContext('2d');
@@ -117,16 +114,19 @@
       saveCanvas.width = width;
       saveCanvas.height = height;
 
-      // カメラ映像を描画
+      // カメラ映像とフレームを合成
       saveCtx.drawImage(video, 0, 0, width, height);
-      // その上にフレーム画像を重ねて描画
       saveCtx.drawImage(canvas, 0, 0, width, height);
 
-      // 画像ファイルを作成して保存を実行
-      const link = document.createElement('a');
-      link.download = 'photo.png';
-      link.href = saveCanvas.toDataURL('image/png');
-      link.click();
+      // 合成した写真を画面（ポップアップ）に表示
+      const resultImg = document.getElementById('result-img');
+      resultImg.src = saveCanvas.toDataURL('image/png');
+      document.getElementById('result-modal').style.display = 'flex';
+    });
+
+    // 「もう一度撮影する」ボタンでポップアップを閉じる
+    document.getElementById('close-btn').addEventListener('click', () => {
+      document.getElementById('result-modal').style.display = 'none';
     });
   </script>
 </body>
