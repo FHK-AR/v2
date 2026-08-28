@@ -10,7 +10,8 @@
     video { width: 100%; height: 100%; object-fit: cover; }
     #chroma-canvas {
       position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-      z-index: 2; pointer-events: none; object-fit: contain;
+      z-index: 2; pointer-events: none; 
+      object-fit: cover; /* ★ここを contain から cover に変更して画面いっぱいに拡大表示します */
     }
   </style>
 </head>
@@ -20,11 +21,11 @@
     <video id="camera" autoplay playsinline muted></video>
   </div>
   
-  <!-- クロマキー処理後の画像を重ねて描画 -->
+  <!-- クロマキー処理後の画像を画面いっぱいに重ねて描画 -->
   <canvas id="chroma-canvas"></canvas>
 
   <script>
-    // --- 1. 画像の指定（1枚のみ） ---
+    // --- 1. 画像の指定 ---
     const frameSrc = 'frame1.png';
 
     // --- 2. クロマキー（緑色透過）処理 ---
@@ -48,7 +49,7 @@
         const g = data[i + 1];
         const b = data[i + 2];
 
-        // G（緑成分）が一定以上かつR/Bより強いピクセルを透明（Alpha = 0）化
+        // G（緑成分）が一定以上かつR/Bより強いピクセルを透明化
         if (g > 90 && g > r * 1.1 && g > b * 1.1) {
           data[i + 3] = 0;
         }
