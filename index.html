@@ -6,44 +6,50 @@
   <title>AR フォトフレーム</title>
   <style>
     body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
+    
+    /* カメラ映像の配置 */
     #video-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
     video { width: 100%; height: 100%; object-fit: cover; }
     
+    /* フレーム画像の配置 */
     #chroma-canvas {
       position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
       z-index: 2; pointer-events: none; object-fit: contain;
     }
 
-    /* シャッターボタンの見た目 */
+    /* シャッターボタンを必ず最前面（z-index: 9999）に配置 */
     #shutter-btn {
       position: fixed;
-      bottom: 30px;
+      bottom: 40px;
       left: 50%;
       transform: translateX(-50%);
-      z-index: 10;
-      width: 70px;
-      height: 70px;
+      z-index: 9999;
+      width: 75px;
+      height: 75px;
       background-color: #ffffff;
-      border: 4px solid rgba(255, 255, 255, 0.6);
+      border: 5px solid rgba(255, 255, 255, 0.7);
       border-radius: 50%;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
       cursor: pointer;
       outline: none;
+      -webkit-tap-highlight-color: transparent;
     }
     #shutter-btn:active {
-      transform: translateX(-50%) scale(0.9);
+      transform: translateX(-50%) scale(0.92);
       background-color: #dddddd;
     }
   </style>
 </head>
 <body>
+  <!-- カメラ映像 -->
   <div id="video-container">
     <video id="camera" autoplay playsinline muted></video>
   </div>
   
+  <!-- フレーム画像を描画するキャンバス -->
   <canvas id="chroma-canvas"></canvas>
 
-  <!-- シャッターボタン -->
+  <!-- 画面最前面に表示されるシャッターボタン -->
   <button id="shutter-btn" aria-label="写真を撮影"></button>
 
   <script>
@@ -53,6 +59,7 @@
     const video = document.getElementById('camera');
     const img = new Image();
 
+    // 1. フレーム画像の読み込みとクロマキー（緑色透過）処理
     img.src = frameSrc;
     img.onload = () => {
       canvas.width = img.width;
@@ -62,7 +69,6 @@
       const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imgData.data;
 
-      // クロマキー透過処理
       for (let i = 0; i < data.length; i += 4) {
         const r = data[i];
         const g = data[i + 1];
@@ -74,7 +80,7 @@
       ctx.putImageData(imgData, 0, 0);
     };
 
-    // カメラ起動
+    // 2. カメラの起動
     navigator.mediaDevices.getUserMedia({
       video: { facingMode: "user" },
       audio: false
@@ -84,24 +90,26 @@
       alert("カメラの起動に失敗しました: " + err);
     });
 
-    // --- シャッターボタン押下時の撮影・保存処理 ---
+    // 3. シャッターボタンを押した時の保存処理
     document.getElementById('shutter-btn').addEventListener('click', () => {
-      // 撮影合成用の非表示キャンバスを作成
+      // 画面上の表示サイズに合わせて撮影用キャンバスを作成
       const saveCanvas = document.createElement('canvas');
       const saveCtx = saveCanvas.getContext('2d');
-      
-      saveCanvas.width = canvas.width || 1080;
-      saveCanvas.height = canvas.height || 1920;
 
-      // 1. カメラ映像を描画
-      saveCtx.drawImage(video, 0, 0, saveCanvas.width, saveCanvas.height);
-      
-      // 2. その上にフレームを描画
-      saveCtx.drawImage(canvas, 0, 0, saveCanvas.width, saveCanvas.height);
+      const width = video.videoWidth || 1080;
+      const height = video.videoHeight || 1920;
 
-      // 3. 画像データ（PNG）としてダウンロード発火
+      saveCanvas.width = width;
+      saveCanvas.height = height;
+
+      // カメラ映像を描画
+      saveCtx.drawImage(video, 0, 0, width, height);
+      // その上にフレーム画像を重ねて描画
+      saveCtx.drawImage(canvas, 0, 0, width, height);
+
+      // 画像ファイルを作成して保存を実行
       const link = document.createElement('a');
-      link.download = 'ar-photo.png';
+      link.download = 'photo.png';
       link.href = saveCanvas.toDataURL('image/png');
       link.click();
     });
