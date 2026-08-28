@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>AR フォトフレーム</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #000; }
+    #video-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
+    video { width: 100%; height: 100%; object-fit: cover; }
+    #chroma-canvas {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      z-index: 2; pointer-events: none; object-fit: contain;
+    }
+  </style>
+</head>
+<body>
+  <!-- カメラ映像を表示 -->
+  <div id="video-container">
+    <video id="camera" autoplay playsinline muted></video>
+  </div>
+  
+  <!-- クロマキー処理後の画像をカメラの上に重ねて描画 -->
+  <canvas id="chroma-canvas"></canvas>
+
+  <script>
+    // --- 1. 期間限定の画像切り替え設定 ---
+    const now = new Date();
+
+    // ※JavaScriptの月は 0=1月, 7=8月, 8=9月, 9=10月 となります
+    const switchDate1 = new Date(2026, 8, 1);  // 2026年9月1日以降は第2弾
+    const switchDate2 = new Date(2026, 9, 1);  // 2026年10月1日以降は第3弾
+
+    let frameSrc = 'frame1.png'; // 本日(8月)は自動的に frame1.png になります
+    if (now >= switchDate2) {
+      frameSrc = 'frame3.png';
+    } else if (now >= switchDate1) {
+      frameSrc = 'frame2.png';
+    }
+
+    // --- 2. クロマキー（緑色透過）リアルタイム処理 ---
+    const img = new Image();
+    img.src = frameSrc;
+    img.onload = () => {
+      const canvas = document.getElementById('chroma-canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = img.width;
+      canvas.height = img.height;
+
+      // 画像をキャンバスに描画
+      ctx.drawImage(img, 0, 0);
+
+      // 画像の全ピクセルデータを取得
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imgData.data;
+
+      // ピクセルごとに緑色（クロマキー）判定をして透明にする
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+
+        // G（緑成分）が一定以上あり、RやBより強い緑色のピクセルを透明化（Alpha = 0）
+        if (g > 90 && g > r * 1.1 && g > b * 1.1) {
+          data[i + 3] = 0;
+        }
+      }
+      
+      // 透過処理済みの画像をキャンバスに再セット
+      ctx.putImageData(imgData, 0, 0);
+    };
+
+    // --- 3. カメラの起動 ---
+    const video = document.getElementById('camera');
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user" },
+      audio: false
+    }).then(stream => {
+      video.srcObject = stream;
+    }).catch(err => {
+      alert("カメラの起動に失敗しました: " + err);
+    });
+  </script>
+</body>
+</html>
