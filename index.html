@@ -8,27 +8,32 @@
     body { margin: 0; overflow: hidden; background: #000; }
     #video-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
     video { width: 100%; height: 100%; object-fit: cover; }
+    
+    /* フレーム画像が絶対に切れず、かつカメラ映像の上に綺麗に乗る設定 */
     #chroma-canvas {
-      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-      z-index: 2; pointer-events: none; 
-      object-fit: cover; /* ★ここを contain から cover に変更して画面いっぱいに拡大表示します */
+      position: fixed; 
+      top: 0; 
+      left: 0; 
+      width: 100vw; 
+      height: 100vh;
+      z-index: 2; 
+      pointer-events: none; 
+      object-fit: contain; /* 文字や枠が画面外に切れるのを防止 */
     }
   </style>
 </head>
 <body>
-  <!-- カメラ映像を表示 -->
+  <!-- カメラ映像 -->
   <div id="video-container">
     <video id="camera" autoplay playsinline muted></video>
   </div>
   
-  <!-- クロマキー処理後の画像を画面いっぱいに重ねて描画 -->
+  <!-- クロマキー処理後のフレームを描画 -->
   <canvas id="chroma-canvas"></canvas>
 
   <script>
-    // --- 1. 画像の指定 ---
     const frameSrc = 'frame1.png';
 
-    // --- 2. クロマキー（緑色透過）処理 ---
     const img = new Image();
     img.src = frameSrc;
     img.onload = () => {
@@ -37,19 +42,17 @@
       canvas.width = img.width;
       canvas.height = img.height;
 
-      // 画像を描画
       ctx.drawImage(img, 0, 0);
 
-      // 緑色（クロマキー）部分を透過処理
       const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imgData.data;
 
+      // クロマキー透過処理
       for (let i = 0; i < data.length; i += 4) {
         const r = data[i];
         const g = data[i + 1];
         const b = data[i + 2];
 
-        // G（緑成分）が一定以上かつR/Bより強いピクセルを透明化
         if (g > 90 && g > r * 1.1 && g > b * 1.1) {
           data[i + 3] = 0;
         }
@@ -57,7 +60,7 @@
       ctx.putImageData(imgData, 0, 0);
     };
 
-    // --- 3. カメラの起動 ---
+    // カメラ起動
     const video = document.getElementById('camera');
     navigator.mediaDevices.getUserMedia({
       video: { facingMode: "user" },
