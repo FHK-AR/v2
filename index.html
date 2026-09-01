@@ -7,21 +7,15 @@
   <style>
     body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
     
-    /* 1. カメラ映像（全画面） */
     #video-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
     video { width: 100%; height: 100%; object-fit: cover; }
     
-    /* 2. 透過フレーム画像（画面内に綺麗に収める） */
     #frame-overlay {
       position: fixed; top: 0; left: 0; width: 100vw; height: calc(100vh - 100px);
       z-index: 2; pointer-events: none;
-      background-image: url('frame1.png');
-      background-size: contain;
-      background-position: center;
-      background-repeat: no-repeat;
+      background-size: contain; background-position: center; background-repeat: no-repeat;
     }
 
-    /* 3. ボタンエリア */
     #ui-container {
       position: fixed; bottom: 0; left: 0; width: 100vw; height: 100px;
       background-color: rgba(0, 0, 0, 0.4); z-index: 9999;
@@ -34,40 +28,27 @@
       box-shadow: 0 0 10px rgba(0,0,0,0.8); cursor: pointer; outline: none;
     }
 
-    /* 4. 撮影結果表示ポップアップ（長押し保存用） */
     #result-modal {
       display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
       background: rgba(0,0,0,0.85); z-index: 10000;
       flex-direction: column; justify-content: center; align-items: center;
     }
-    #result-img {
-      max-width: 85%; max-height: 70vh; border-radius: 8px;
-      box-shadow: 0 0 20px rgba(255,255,255,0.2);
-    }
-    #modal-msg {
-      color: #fff; margin: 15px 0; font-size: 14px; font-weight: bold; text-align: center;
-    }
-    #close-btn {
-      padding: 10px 25px; background: #ffffff; border: none;
-      border-radius: 20px; font-weight: bold; cursor: pointer;
-    }
+    #result-img { max-width: 85%; max-height: 70vh; border-radius: 8px; box-shadow: 0 0 20px rgba(255,255,255,0.2); }
+    #modal-msg { color: #fff; margin: 15px 0; font-size: 14px; font-weight: bold; text-align: center; }
+    #close-btn { padding: 10px 25px; background: #ffffff; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; }
   </style>
 </head>
 <body>
-  <!-- カメラ映像 -->
   <div id="video-container">
     <video id="camera" autoplay playsinline muted></video>
   </div>
   
-  <!-- 透過フレーム画像 -->
   <div id="frame-overlay"></div>
 
-  <!-- シャッターボタンエリア -->
   <div id="ui-container">
     <button id="shutter-btn" aria-label="写真を撮影"></button>
   </div>
 
-  <!-- 撮影結果表示モーダル -->
   <div id="result-modal">
     <img id="result-img" alt="撮影した写真">
     <p id="modal-msg">画像を長押しして「"写真"に保存」を選択してください</p>
@@ -76,18 +57,51 @@
 
   <script>
     const video = document.getElementById('camera');
+    const frameOverlay = document.getElementById('frame-overlay');
     const frameImage = new Image();
-    frameImage.src = 'frame1.png'; // 透過PNGのファイル名
+    let isImageLoaded = false;
 
-    // カメラ起動
-    navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user" }, audio: false
-    }).then(stream => {
-      video.srcObject = stream;
-    }).catch(err => alert("カメラの起動に失敗しました: " + err));
+    // 1. 画像の確実な事前読み込み（エラー防止）
+    const imagePath = 'frame1.png';
+    frameImage.src = imagePath;
+    frameImage.onload = () => {
+      isImageLoaded = true;
+      frameOverlay.style.backgroundImage = `url('${imagePath}')`;
+    };
+    frameImage.onerror = () => {
+      alert("フレーム画像の読み込みに失敗しました。ファイル名(frame1.png)を確認してください。");
+    };
 
-    // シャッターボタンタップ時の撮影＆合成処理
+    // 2. カメラ起動処理（フォールバック機能付き）
+    async function startCamera() {
+      // 第一希望：インカメラ（自撮り）
+      const primaryConstraints = { video: { facingMode: "user" }, audio: false };
+      // 第二希望（失敗時の代替）：標準のカメラ機能
+      const fallbackConstraints = { video: true, audio: false };
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(primaryConstraints);
+        video.srcObject = stream;
+      } catch (err) {
+        console.warn("インカメラの起動に失敗。代替設定で再試行します:", err);
+        try {
+          const fallbackStream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+          video.srcObject = fallbackStream;
+        } catch (fallbackErr) {
+          alert("カメラを起動できませんでした。\nブラウザのアクセス許可（権限）をオンにするか、Safari/Chromeなどの標準ブラウザで開き直してください。");
+        }
+      }
+    }
+
+    startCamera();
+
+    // 3. シャッター処理
     document.getElementById('shutter-btn').addEventListener('click', () => {
+      if (!isImageLoaded) {
+        alert("画像の読み込み中です。少し待ってから再度押してください。");
+        return;
+      }
+
       const saveCanvas = document.createElement('canvas');
       const saveCtx = saveCanvas.getContext('2d');
 
@@ -97,19 +111,14 @@
       saveCanvas.width = width;
       saveCanvas.height = height;
 
-      // 1. カメラ映像を描画
       saveCtx.drawImage(video, 0, 0, width, height);
-      
-      // 2. 透過PNGフレームを上にそのまま重ねて描画
       saveCtx.drawImage(frameImage, 0, 0, width, height);
 
-      // 3. モーダルに撮影画像を表示
       const resultImg = document.getElementById('result-img');
       resultImg.src = saveCanvas.toDataURL('image/png');
       document.getElementById('result-modal').style.display = 'flex';
     });
 
-    // モーダルを閉じる
     document.getElementById('close-btn').addEventListener('click', () => {
       document.getElementById('result-modal').style.display = 'none';
     });
