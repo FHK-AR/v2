@@ -11,10 +11,14 @@
     #video-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
     video { width: 100%; height: 100%; object-fit: cover; }
     
-    /* 2. フレーム画像 */
-    #chroma-canvas {
+    /* 2. 透過フレーム画像（画面内に綺麗に収める） */
+    #frame-overlay {
       position: fixed; top: 0; left: 0; width: 100vw; height: calc(100vh - 100px);
-      z-index: 2; pointer-events: none; object-fit: contain;
+      z-index: 2; pointer-events: none;
+      background-image: url('frame1.png');
+      background-size: contain;
+      background-position: center;
+      background-repeat: no-repeat;
     }
 
     /* 3. ボタンエリア */
@@ -30,7 +34,7 @@
       box-shadow: 0 0 10px rgba(0,0,0,0.8); cursor: pointer; outline: none;
     }
 
-    /* 4. 撮影結果モーダル（写真保存用ポップアップ） */
+    /* 4. 撮影結果表示ポップアップ（長押し保存用） */
     #result-modal {
       display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
       background: rgba(0,0,0,0.85); z-index: 10000;
@@ -55,15 +59,15 @@
     <video id="camera" autoplay playsinline muted></video>
   </div>
   
-  <!-- フレーム画像エリア -->
-  <canvas id="chroma-canvas"></canvas>
+  <!-- 透過フレーム画像 -->
+  <div id="frame-overlay"></div>
 
   <!-- シャッターボタンエリア -->
   <div id="ui-container">
     <button id="shutter-btn" aria-label="写真を撮影"></button>
   </div>
 
-  <!-- 撮影結果表示ポップアップ -->
+  <!-- 撮影結果表示モーダル -->
   <div id="result-modal">
     <img id="result-img" alt="撮影した写真">
     <p id="modal-msg">画像を長押しして「"写真"に保存」を選択してください</p>
@@ -71,20 +75,18 @@
   </div>
 
   <script>
-    const frameSrc = 'frame1.png';
-    const canvas = document.getElementById('chroma-canvas');
-    const ctx = canvas.getContext('2d');
     const video = document.getElementById('camera');
-    const img = new Image();
+    const frameImage = new Image();
+    frameImage.src = 'frame1.png'; // 透過PNGのファイル名
 
-       // カメラ起動
+    // カメラ起動
     navigator.mediaDevices.getUserMedia({
       video: { facingMode: "user" }, audio: false
     }).then(stream => {
       video.srcObject = stream;
     }).catch(err => alert("カメラの起動に失敗しました: " + err));
 
-    // シャッターボタンタップ時の処理
+    // シャッターボタンタップ時の撮影＆合成処理
     document.getElementById('shutter-btn').addEventListener('click', () => {
       const saveCanvas = document.createElement('canvas');
       const saveCtx = saveCanvas.getContext('2d');
@@ -95,17 +97,19 @@
       saveCanvas.width = width;
       saveCanvas.height = height;
 
-      // カメラ映像とフレームを合成
+      // 1. カメラ映像を描画
       saveCtx.drawImage(video, 0, 0, width, height);
-      saveCtx.drawImage(canvas, 0, 0, width, height);
+      
+      // 2. 透過PNGフレームを上にそのまま重ねて描画
+      saveCtx.drawImage(frameImage, 0, 0, width, height);
 
-      // 合成した写真を画面（ポップアップ）に表示
+      // 3. モーダルに撮影画像を表示
       const resultImg = document.getElementById('result-img');
       resultImg.src = saveCanvas.toDataURL('image/png');
       document.getElementById('result-modal').style.display = 'flex';
     });
 
-    // 「もう一度撮影する」ボタンでポップアップを閉じる
+    // モーダルを閉じる
     document.getElementById('close-btn').addEventListener('click', () => {
       document.getElementById('result-modal').style.display = 'none';
     });
